@@ -1,5 +1,5 @@
 "use strict";
-const is_saveLocal = false;
+const is_saveLocal = true;
 
 // load packages
 const AWS = require('aws-sdk');
@@ -16,7 +16,7 @@ const isEnableWatchdog = ((hour === 13 || hour === 1) && (min >= 56 || min <= 3)
 
 // get credentials
 const credentials = {
-	count:						20,
+	count:						2,
 	targetID:					process.env.twtr_targetID,
 	since_id:					process.env.twtr_since_id,
 	imgSavePath:				'images/',
@@ -130,26 +130,24 @@ const fetchImage = (fetchParam) => {
 	});
 };
 
-const saveLocal = (fileMeta) => {
-	console.log('saveLocal')
-	return;
+const saveLocal = (file, fileMeta) => {
 	// save local
-	// fs.mkdir(fileMeta.imgSavePath, function(err) {
-	// 	if (err && err.code !== 'EEXIST'){
-	// 		console.log('code: %s', err.code);
-	// 		console.log('err: %s', err);
-	// 		return false;
-	// 	}
-	// 	fs.mkdir(fileMeta.dest, function(err) {
-	// 		if (err && err.code !== 'EEXIST'){
-	// 			console.log('err: %s', err);
-	// 			return false;
-	// 		}
-	// 		fs.writeFileSync(fileMeta.dest + fileMeta.fileName, fileMeta.body, 'binary');
-	// 	});
-	// });
+	fs.mkdir(fileMeta.imgSavePath, function(err) {
+		if (err && err.code !== 'EEXIST'){
+			console.log('code: %s', err.code);
+			console.log('err: %s', err);
+			return false;
+		}
+		fs.mkdir(fileMeta.dest, function(err) {
+			if (err && err.code !== 'EEXIST'){
+				console.log('err: %s', err);
+				return false;
+			}
+			fs.writeFileSync(fileMeta.dest + fileMeta.fileName, file, 'binary');
+		});
+	});
 };
-const saveS3 = (fileMeta) => {
+const saveS3 = (file, fileMeta) => {
 	console.log('saveS3')
 	return;
 	// 	const prop = requestParam.fileMeta.objectProp;
@@ -164,7 +162,7 @@ const saveS3 = (fileMeta) => {
 	// 		}
 	// 	});
 	// });
-	fileMeta.objectProp.Body = fileMeta.body;
+	fileMeta.objectProp.Body = file;
 	s3.putObject(fileMeta.objectProp, function(err, result) {
 		if (err) {
 			console.log('========== err:S3 ==========');
@@ -210,6 +208,7 @@ const fetchSaveImages = (mediaIdURL_arr, tweetScreenName, slackPayload) => {
 	requestParam_arr.forEach(async (requestParam) => {
 		const file = await fetchImage(requestParam.fetchParam);
 		const _slack = (requestParam.postSlack) ? slackPayload : null;
+		// TODO: ファイルの存在確認
 		saveImage(file, requestParam, _slack);
 	});
 };
