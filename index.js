@@ -46,6 +46,16 @@ const twitterClient = new twitter(credentials.twtr);
 // AWS.Config(credentials.aws);
 const s3 = new AWS.S3();
 
+// Slackに投げるObjectの生成
+const generateSlackPayload = (text, isWatchdog) => {
+	const icon_url = credentials.slack.icon_url;
+	const username = credentials.slack.username;
+	const channel =  credentials.slack.channel;
+	if (isWatchdog) {
+		text = 'いきてるよー。';
+	}
+	return {icon_url, username, channel, text};
+};
 const selectHighestBitrate = (variants) => {
 	// 空の物を用意しておく
 	let highest = { bitrate: 0 };
@@ -110,12 +120,12 @@ const fetchFav = (context, callback) => {
 			const media = (extended_entities) ? extended_entities.media : null;
 			const media_arr = parseMediaURLs(media);
 
+			// tweetのURLを生成
 			const tweet_url = twitter_url + screen_name + '/status/' + tweet.id_str;
-			let text = '@' + credentials.targetID + 'でfavした画像だよ。\n' + tweet_url;
-		// 	const payload = generateSlackPayload(text, isEnableWatchdog);
-
+			// slackに投げる文字列の生成
+			const slackMsg = '@' + credentials.targetID + 'でfavした画像だよ。\n' + tweet_url;
+			const slackPayload = generateSlackPayload(slackMsg);
 			if(media_arr) {
-				console.log(media_arr);
 		// 		saveImages(media_arr, screen_name , false, payload);
 			}
 			console.log(tweet_url);
