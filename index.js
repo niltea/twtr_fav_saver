@@ -19,6 +19,8 @@ const credentials = {
 	count:						20,
 	targetID:					process.env.twtr_targetID,
 	since_id:					process.env.twtr_since_id,
+	imgSavePath:				'images/',
+	bucket:						'niltea-twitter',
 	twtr: {
 		consumer_key:			process.env.twtr_consumer_key,
 		consumer_secret:		process.env.twtr_consumer_secret,
@@ -56,6 +58,69 @@ const generateSlackPayload = (text, isWatchdog) => {
 	}
 	return {icon_url, username, channel, text};
 };
+
+const setRequestParam = (mediaIdURL, imgSavePath, tweetScreenName) => {
+	// URLが入ってなかったらreturn
+	if (mediaIdURL.url === undefined) return false;
+
+	const dest = imgSavePath + tweetScreenName + '/';
+	const ext = mediaIdURL.url.match(/\.[a-zA-Z0-9]+$/)[0];
+	const fileName = mediaIdURL.id + ext;
+	// content typeを拡張子から判定
+	const contentType = (() => {
+		if (ext === '.jpg') return 'image/jpeg';
+		if (ext === '.gif') return 'image/gif';
+		if (ext === '.png') return 'image/png';
+		if (ext === '.bmp') return 'image/x-bmp';
+		if (ext === '.mp4') return 'image/mp4';
+		return null;
+	})();
+
+	// クエリパラメーター生成
+	const queryParam = {
+		method:   'GET',
+		url:      mediaIdURL.url,
+		encoding: null,
+		headers:  {
+			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 Safari/537.36'
+		}
+	};
+
+	// 保存ファイルのメタデーター作成
+	const fileMeta = {
+		ext:             ext,
+		dest:            dest,
+		imgSavePath:     imgSavePath,
+		fileName:        fileName,
+		tweetScreenName: tweetScreenName,
+		objectProp: {
+			Bucket:      credentials.bucket,
+			Key:         dest + fileName,
+			ContentType: contentType
+		}
+	};
+	return {queryParam, fileMeta};
+};
+
+// 画像のフェッチを行い、保存する
+const fetchSaveImages = (mediaIdURL_arr, tweetScreenName, payload) => {
+	const imgSavePath = credentials.imgSavePath;
+
+	// 渡されたURLをForeachし、Fetchパラメーターを生成する
+	let requestParam_arr = [];
+	mediaIdURL_arr.forEach((mediaIdURL, mediaCount) => {
+		const requestParam = setRequestParam(mediaIdURL, imgSavePath, tweetScreenName);
+		requestParam.postSlack = (mediaCount === 0) ? true : false;
+
+		// ないとは思うけど空だったら何もせずにreturn
+		if(!requestParam) return;
+		requestParam_arr.push(requestParam);
+	});
+	return;
+};
+
+};
+};
 const selectHighestBitrate = (variants) => {
 	// 空の物を用意しておく
 	let highest = { bitrate: 0 };
@@ -70,9 +135,9 @@ const selectHighestBitrate = (variants) => {
 	return highest.url;
 };
 
-const parseMediaURLs = mediaArr => {
+const parseMediaIdURLs = mediaArr => {
 	if (mediaArr === null) return null;
-	const mediaURLs = [];
+	const mediaIdURLs = [];
 
 	// arrayからURLを探し出す
 	mediaArr.forEach(media => {
@@ -84,9 +149,9 @@ const parseMediaURLs = mediaArr => {
 			// 動画の場合は複数URLの中からもっともビットレートの高い物を選ぶ
 			return selectHighestBitrate (media.video_info.variants);
 		})();
-		mediaURLs.push({id, url});
+		mediaIdURLs.push({id, url});
 	});
-	return mediaURLs;
+	return mediaIdURLs;
 };
 
 const fetchFav = (context, callback) => {
@@ -115,20 +180,19 @@ const fetchFav = (context, callback) => {
 		tweets.forEach((tweet) => {
 			// get tweer data
 			const user = tweet.user;
-			const screen_name = user.screen_name;
+			const tweetScreenName = user.screen_name;
 			const extended_entities = tweet.extended_entities;
-			const media = (extended_entities) ? extended_entities.media : null;
-			const media_arr = parseMediaURLs(media);
+			const mediaInPost = (extended_entities) ? extended_entities.media : null;
+			const mediaIdURLs = parseMediaIdURLs(mediaInPost);
 
 			// tweetのURLを生成
-			const tweet_url = twitter_url + screen_name + '/status/' + tweet.id_str;
+			const tweet_url = twitter_url + tweetScreenName + '/status/' + tweet.id_str;
 			// slackに投げる文字列の生成
 			const slackMsg = '@' + credentials.targetID + 'でfavした画像だよ。\n' + tweet_url;
 			const slackPayload = generateSlackPayload(slackMsg);
-			if(media_arr) {
-		// 		saveImages(media_arr, screen_name , false, payload);
+			if(mediaIdURLs) {
+				fetchSaveImages(mediaIdURLs, tweetScreenName, slackPayload);
 			}
-			console.log(tweet_url);
 
 			// set tweet IDs
 			if (lastID === 0) { lastID = tweet.id_str; }
