@@ -46,7 +46,21 @@ const twitterClient = new twitter(credentials.twtr);
 // AWS.Config(credentials.aws);
 const s3 = new AWS.S3();
 
-const mediaURLsParse = mediaArr => {
+const selectHighestBitrate = (variants) => {
+	// 空の物を用意しておく
+	let highest = { bitrate: 0 };
+	variants.forEach (variant => {
+		// mp4じゃなかったら帰る
+		if(variant.content_type !== 'video/mp4') return;
+		// もし今までの物よりビットレートが高ければ、上書きする
+		if ( highest.bitrate < variant.bitrate) {
+			highest = variant;
+		}
+	});
+	return highest.url;
+};
+
+const parseMediaURLs = mediaArr => {
 	if (mediaArr === null) return null;
 	const mediaURLs = [];
 
@@ -58,18 +72,7 @@ const mediaURLsParse = mediaArr => {
 			// 動画以外であればすぐ取得できる
 			if (media.type !== 'video') return media.media_url_https;
 			// 動画の場合は複数URLの中からもっともビットレートの高い物を選ぶ
-			const variants = media.video_info.variants;
-			// 空の物を用意しておく
-			let highestVariant = { bitrate: 0 };
-			variants.forEach (variant => {
-				// mp4じゃなかったら帰る
-				if(variant.content_type !== 'video/mp4') return;
-				// もし今までの物よりビットレートが高ければ、上書きする
-				if ( highestVariant.bitrate < variant.bitrate) {
-					highestVariant = variant;
-				}
-			});
-			return highestVariant.url;
+			return selectHighestBitrate (media.video_info.variants);
 		})();
 		mediaURLs.push({id, url});
 	});
@@ -105,7 +108,7 @@ const fetchFav = (context, callback) => {
 			const screen_name = user.screen_name;
 			const extended_entities = tweet.extended_entities;
 			const media = (extended_entities) ? extended_entities.media : null;
-			const media_arr = mediaURLsParse(media);
+			const media_arr = parseMediaURLs(media);
 
 			const tweet_url = twitter_url + screen_name + '/status/' + tweet.id_str;
 			let text = '@' + credentials.targetID + 'でfavした画像だよ。\n' + tweet_url;
