@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "aws-sdk": "^2.88.0",
+    "fs": "^0.0.1-security",
+    "querystring": "^0.2.0",
+    "request": "^2.81.0",
+    "twitter": "^1.7.1"
+  },
+  "name": "twtr_fav_to_slack",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "niltea <futurabodoni@gmail.com>",
+  "license": "MIT"
+}
