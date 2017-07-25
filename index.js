@@ -16,11 +16,11 @@ const isEnableWatchdog = ((hour === 13 || hour === 1) && (min >= 56 || min <= 3)
 
 // get credentials
 const credentials = {
-	count:						2,
+	tweets_count:				process.env.tweets_count,
 	targetID:					process.env.twtr_targetID,
-	since_id:					process.env.twtr_since_id,
+	// since_id:				process.env.twtr_since_id,
 	imgSavePath:				'images/',
-	bucket:						'niltea-twitter',
+	bucket:						process.env.aws_s3_saveBucket,
 	twtr: {
 		consumer_key:			process.env.twtr_consumer_key,
 		consumer_secret:		process.env.twtr_consumer_secret,
@@ -49,13 +49,8 @@ const twitterClient = new twitter(credentials.twtr);
 const s3 = new AWS.S3();
 
 const postSlack = (slackPayload) => {
-	var headers = {
-		'Content-Type':'application/json'
-	}
-
-	var options = {
-		json: slackPayload
-	}
+	const headers = { 'Content-Type':'application/json' };
+	const options = { json: slackPayload };
 	request.post(credentials.slack.url, options, (error, response, body) => {
 		if (response.body !== 'ok') {
 			console.log(error);
@@ -249,7 +244,7 @@ const parseMediaIdURLs = mediaArr => {
 const fetchFav = (context, callback) => {
 	const params = {
 		screen_name:	credentials.targetID,
-		count:			credentials.count,
+		count:			credentials.tweets_count,
 		// since_id:		credentials.since_id,
 	};
 	const endpoint = 'favorites/list.json';
