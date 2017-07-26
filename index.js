@@ -50,9 +50,7 @@ const s3 = new AWS.S3(credentials.aws);
 const twId = new class {
 	constructor () {
 		this.tw_target_id = 'niltea';
-		this.dbParam = {
-			TableName: 'twtr_fav',
-		};
+		this.TableName = 'twtr_fav';
 		this.dynamodb = new AWS.DynamoDB({
 			region: credentials.aws.region
 		});
@@ -64,31 +62,40 @@ const twId = new class {
 		})
 		return idArr_formatted;
 	}
-	putTweetsId (idArr) {
-		const _dbParam = this.dbParam;
-		_dbParam.Item = {
-			target_id:  {"S": this.tw_target_id},
-			tweets: {"L": this.formatID(idArr)}
+	putTweetsId (idArr, callback) {
+		const _dbParam = {
+			TableName: this.TableName,
+			Item: {
+				target_id:  {"S": this.tw_target_id},
+				tweets: {"L": this.formatID(idArr)}
+			}
 		};
 		this.dynamodb.putItem(_dbParam, function(err, data) {
 			if (err) {
 				console.log(err, err.stack);
-			} else {
-				console.log(data);
+				callback(err)
 			}
 		});
 	}
-	getLastId () {
+	getTweetsId (callback) {
 		return new Promise((resolve, reject) => {
-			const _dbParam = this.dbParam;
-			_dbParam.Key = {
-				target_id: {"S": this.tw_target_id}
+			const _dbParam = {
+				TableName: this.TableName,
+				Key: {
+					target_id: {"S": this.tw_target_id}
+				}
 			};
 			this.dynamodb.getItem(_dbParam, function(err, data) {
-				if (err) reject(err, err.stack);
+				if (err) {
+					reject(err, err.stack);
+					callback(err);
+				}
 				const item = data.Item;
-				const tweet_last = parseInt(item.tweet_last.N, 10);
-				resolve(tweet_last);
+				const tweetsList = [];
+				item.tweets.L.forEach(item => {
+					tweetsList.push(item.S);
+				})
+				resolve(tweetsList);
 			});
 		});
 	}
@@ -311,25 +318,26 @@ const parseMediaIdURLs = mediaArr => {
 	return mediaIdURLs;
 };
 
-const formatTweets = (tweets_raw, callback) => {
+const formatTweets = (tweets_raw, tweets_saved, callback) => {
 	const tweetsCount = tweets_raw.length - 1;
 	// 戻り値を格納する配列
 	const tweets_arr = [];
 	const tweets_IDs = [];
 	let count = 0;
 	tweets_raw.forEach((tweet) => {
-		// TODO: IDが取得済みのものだったらreturnする処理
-
-		// console.log(tweet.id_str);
-		// return;
-		// get tweer data
+		// get tweet data
 		const id = tweet.id_str;
 		const user = tweet.user;
 		const tweetScreenName = user.screen_name;
 		const extended_entities = tweet.extended_entities;
 		const mediaInPost = (extended_entities) ? extended_entities.media : null;
+
+		// 処理したIDを突っ込んでおく
+		tweets_IDs.push(id);
 		// media付きでなければ戻る
 		if (!mediaInPost) return;
+		// TODO: IDが取得済みのものだったらreturnする処理
+		if (tweets_saved.indexOf(id) >= 0) return;
 
 		// mediaのURLを取得する
 		const mediaIdURL_arr = parseMediaIdURLs(mediaInPost);
@@ -342,7 +350,6 @@ const formatTweets = (tweets_raw, callback) => {
 
 		// 出力データをセット
 		tweets_arr.push({id, tweetScreenName, mediaIdURL_arr, slackPayload});
-		tweets_IDs.push(id);
 		count += 1;
 	});
 	return {count, tweets_IDs, tweets_arr};
@@ -361,12 +368,12 @@ const hoge = () => {
 };
 
 exports.handler = async (event, context, callback) => {
-	// const since_id = await twId.getLastId();
+	const tweets_saved = await twId.getTweetsId(callback);
 	const tweets_raw = await fetchFav(callback);
-	const tweets_formatted = await formatTweets(tweets_raw, callback);
+	const tweets_formatted = await formatTweets(tweets_raw, tweets_saved, callback);
 
 	// DBに取得済みのtweets_idを保存
-	twId.putTweetsId(tweets_formatted.tweets_IDs);
+	twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
 
 	// console.log(tweets_formatted.tweets_arr);
 	tweets_formatted.tweets_arr.forEach(tweet => {
