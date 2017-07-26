@@ -57,17 +57,24 @@ const twId = new class {
 			region: credentials.aws.region
 		});
 	}
-	putTweetsId (id) {
+	formatID (idArr) {
+		const idArr_formatted = [];
+		idArr.forEach (id => {
+			idArr_formatted.push ({ S: id });
+		})
+		return idArr_formatted;
+	}
+	putTweetsId (idArr) {
 		const _dbParam = this.dbParam;
 		_dbParam.Item = {
 			target_id:  {"S": this.tw_target_id},
-			tweet_last: {"N": id}
+			tweets: {"L": this.formatID(idArr)}
 		};
 		this.dynamodb.putItem(_dbParam, function(err, data) {
 			if (err) {
 				console.log(err, err.stack);
 			} else {
-				console.log(util.inspect(data, false, null));
+				console.log(data);
 			}
 		});
 	}
@@ -359,7 +366,8 @@ exports.handler = async (event, context, callback) => {
 	const tweets_formatted = await formatTweets(tweets_raw, callback);
 
 	// DBに取得済みのtweets_idを保存
-	// twId.putTweetsId(tweets_formatted.tweets_IDs);
+	twId.putTweetsId(tweets_formatted.tweets_IDs);
+
 	// console.log(tweets_formatted.tweets_arr);
 	tweets_formatted.tweets_arr.forEach(tweet => {
 		fetchSaveImages(tweet);
