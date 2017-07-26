@@ -1,5 +1,5 @@
 "use strict";
-const is_saveLocal = true;
+const is_saveLocal = false;
 
 // load packages
 const AWS = require('aws-sdk');
@@ -16,9 +16,8 @@ const isEnableWatchdog = ((hour === 13 || hour === 1) && (min >= 56 || min <= 3)
 
 // get credentials
 const credentials = {
-	tweets_count:				process.env.tweets_count,
-	targetID:					process.env.twtr_targetID,
-	// since_id:				process.env.twtr_since_id,
+	tweets_count:				20,
+	targetID:					null,
 	imgSavePath:				'images/',
 	bucket:						process.env.aws_s3_saveBucket,
 	twtr: {
@@ -40,16 +39,11 @@ const credentials = {
 	}
 };
 
-
 const twitter_url = 'https://twitter.com/';
-// init aws
-// AWS.Config(credentials.aws);
-const s3 = new AWS.S3(credentials.aws);
 
 // dynamoDB
 const twId = new class {
 	constructor () {
-		this.tw_target_id = 'niltea';
 		this.TableName = 'twtr_fav';
 		this.dynamodb = new AWS.DynamoDB({
 			region: credentials.aws.region
@@ -66,7 +60,7 @@ const twId = new class {
 		const _dbParam = {
 			TableName: this.TableName,
 			Item: {
-				target_id:  {"S": this.tw_target_id},
+				target_id:  {"S": credentials.targetID},
 				tweets: {"L": this.formatID(idArr)}
 			}
 		};
@@ -82,7 +76,7 @@ const twId = new class {
 			const _dbParam = {
 				TableName: this.TableName,
 				Key: {
-					target_id: {"S": this.tw_target_id}
+					target_id: {"S": credentials.targetID}
 				}
 			};
 			this.dynamodb.getItem(_dbParam, function(err, data) {
@@ -178,7 +172,7 @@ const fetchImage = (fetchParam) => {
 	});
 };
 
-const saveLocal = (file, fileMeta) => {
+const saveLocal = ({body, fileMeta, slackPayload}) => {
 	// save local
 	fs.mkdir(fileMeta.imgSavePath, function(err) {
 		if (err && err.code !== 'EEXIST'){
@@ -191,50 +185,41 @@ const saveLocal = (file, fileMeta) => {
 				console.log('err: %s', err);
 				return false;
 			}
-			fs.writeFileSync(fileMeta.dest + fileMeta.fileName, file, 'binary');
+			fs.writeFileSync(fileMeta.dest + fileMeta.fileName, body, 'binary');
+			if (slackPayload) postSlack(slackPayload);
 		});
 	});
 };
-const saveS3 = (file, fileMeta) => {
-	console.log('saveS3')
-	return;
-	// 	const prop = requestParam.fileMeta.objectProp;
-	// 	delete prop.ContentType;
-	// 	s3.headObject(prop, function(err, result) {
-	// 		if (err && err.statusCode === 404) {
-	// 			if(requestParam.postSlack && !false) postSlack(payload);
-	// 			fetchImage(requestParam);
-	// 			return;
-	// 		} else {
-	// 			return false;
-	// 		}
-	// 	});
-	// });
-	fileMeta.objectProp.Body = file;
-	s3.putObject(fileMeta.objectProp, function(err, result) {
+const saveS3 = ({body, fileMeta, slackPayload}) => {
+	// init S3
+	const s3 = new AWS.S3(credentials.aws);
+
+	const s3Prop = fileMeta.objectProp;
+	s3Prop.Body = body;
+	s3.putObject(s3Prop, function(err, result) {
 		if (err) {
 			console.log('========== err:S3 ==========');
 			console.log(err);
 			return false;
 		} else {
 			console.log('saved');
+			if (slackPayload) postSlack(slackPayload);
 			return true;
 		}
 	});
 };
 
 // 画像の保存を行う
-const saveImage = (file, requestParam, slackPayload) => {
-	if(!file) {
+const saveImage = (fileData) => {
+	if(!fileData.body) {
 		console.log('err: no body');
 		return;
 	}
 	if(is_saveLocal) {
-		saveLocal(file, requestParam.fileMeta);
+		saveLocal(fileData);
 	} else {
-		saveS3(file, requestParam.fileMeta);
+		saveS3(fileData);
 	}
-	// if (slackPayload) postSlack(slackPayload);
 };
 
 // 画像のフェッチを行い、保存する
@@ -254,10 +239,12 @@ const fetchSaveImages = (tweet) => {
 
 	// パラメータをもとにファイルのFetchと保存
 	requestParam_arr.forEach(async (requestParam) => {
-		const file = await fetchImage(requestParam.fetchParam);
 		const _slack = (requestParam.postSlack) ? slackPayload : null;
-		// TODO: ファイルの存在確認
-		saveImage(file, requestParam, _slack);
+		saveImage({
+			body:         await fetchImage(requestParam.fetchParam),
+			fileMeta:     requestParam.fileMeta,
+			slackPayload: _slack
+		});
 	});
 };
 
@@ -356,6 +343,7 @@ const formatTweets = (tweets_raw, tweets_saved, callback) => {
 };
 
 exports.handler = async (event, context, callback) => {
+	credentials.targetID = event.target_id || 'niltea';
 	const tweets_saved = await twId.getTweetsId(callback);
 	const tweets_raw = await fetchFav(callback);
 	const tweets_formatted = await formatTweets(tweets_raw, tweets_saved, callback);
@@ -370,9 +358,11 @@ exports.handler = async (event, context, callback) => {
 		return;
 	}
 
-	// console.log(tweets_formatted.tweets_arr);
 	tweets_formatted.tweets_arr.forEach(tweet => {
 		fetchSaveImages(tweet);
 	});
+	// DBに取得済みのtweets_idを保存
+	twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
+
 	console.log('count: %s', tweets_formatted.count);
 };

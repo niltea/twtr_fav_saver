@@ -1,7 +1,5 @@
 'use strict';// test script
-var event = {
-    "Records": [ { "s3": { "bucket": { "name": "mybucket" }, "object": { "key": "test.json" } } } ]
-};
+var event = {"target_id": "niltea"};
 
 var context = {};
 var callback = function(err, data) {
