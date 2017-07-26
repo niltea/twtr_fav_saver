@@ -46,7 +46,48 @@ const twitterClient = new twitter(credentials.twtr);
 
 // init aws
 // AWS.Config(credentials.aws);
-const s3 = new AWS.S3();
+const s3 = new AWS.S3(credentials.aws);
+
+// dynamoDB
+const twId = new class {
+	constructor () {
+		this.tw_target_id = 'niltea';
+		this.dbParam = {
+			TableName: 'twtr_fav',
+		};
+		this.dynamodb = new AWS.DynamoDB({
+			region: credentials.aws.region
+		});
+	}
+	putLastId (id) {
+		const _dbParam = this.dbParam;
+		_dbParam.Item = {
+			target_id:  {"S": this.tw_target_id},
+			tweet_last: {"N": id}
+		};
+		this.dynamodb.putItem(_dbParam, function(err, data) {
+			if (err) {
+				console.log(err, err.stack);
+			} else {
+				console.log(util.inspect(data, false, null));
+			}
+		});
+	}
+	getLastId () {
+		return new Promise((resolve, reject) => {
+			const _dbParam = this.dbParam;
+			_dbParam.Key = {
+				target_id: {"S": this.tw_target_id}
+			};
+			this.dynamodb.getItem(_dbParam, function(err, data) {
+				if (err) reject(err, err.stack);
+				const item = data.Item;
+				const tweet_last = parseInt(item.tweet_last.N, 10);
+				resolve(tweet_last);
+			});
+		});
+	}
+};
 
 const postSlack = (slackPayload) => {
 	const headers = { 'Content-Type':'application/json' };
