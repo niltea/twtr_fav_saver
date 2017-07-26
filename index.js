@@ -289,8 +289,6 @@ const fetchFav = (context, callback) => {
 		// since_id:		credentials.since_id,
 	};
 	const endpoint = 'favorites/list.json';
-	let lastID = 0;
-	let firstID = 0;
 
 	twitterClient.get(endpoint , params, (error, tweets, response) => {
 		// エラーが発生してたらメッセージを表示して終了
@@ -326,10 +324,6 @@ const fetchFav = (context, callback) => {
 			if(mediaIdURLs) {
 				fetchSaveImages(mediaIdURLs, tweetScreenName, slackPayload);
 			}
-
-			// set tweet IDs
-			if (lastID === 0) { lastID = tweet.id_str; }
-			firstID = tweet.id_str;
 		});
 		console.log('count: %s, first: %s, last: %s', l + 1,  firstID, lastID);
 	});
