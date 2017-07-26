@@ -41,6 +41,7 @@ const credentials = {
 };
 
 
+const twitter_url = 'https://twitter.com/';
 // init aws
 // AWS.Config(credentials.aws);
 const s3 = new AWS.S3(credentials.aws);
@@ -56,7 +57,7 @@ const twId = new class {
 			region: credentials.aws.region
 		});
 	}
-	putLastId (id) {
+	putTweetsId (id) {
 		const _dbParam = this.dbParam;
 		_dbParam.Item = {
 			target_id:  {"S": this.tw_target_id},
@@ -223,9 +224,9 @@ const saveImage = (file, requestParam, slackPayload) => {
 };
 
 // 画像のフェッチを行い、保存する
-const fetchSaveImages = (mediaIdURL_arr, tweetScreenName, slackPayload) => {
+const fetchSaveImages = (tweet) => {
+	const {mediaIdURL_arr, tweetScreenName, slackPayload} = tweet;
 	const imgSavePath = credentials.imgSavePath;
-
 	// 渡されたURLをForeachし、Fetchパラメーターを生成する
 	let requestParam_arr = [];
 	mediaIdURL_arr.forEach((mediaIdURL, mediaCount) => {
@@ -246,41 +247,7 @@ const fetchSaveImages = (mediaIdURL_arr, tweetScreenName, slackPayload) => {
 	});
 };
 
-const selectHighestBitrate = (variants) => {
-	// 空の物を用意しておく
-	let highest = { bitrate: 0 };
-	variants.forEach (variant => {
-		// mp4じゃなかったら帰る
-		if(variant.content_type !== 'video/mp4') return;
-		// もし今までの物よりビットレートが高ければ、上書きする
-		if ( highest.bitrate < variant.bitrate) {
-			highest = variant;
-		}
-	});
-	return highest.url;
-};
-
-const parseMediaIdURLs = mediaArr => {
-	if (mediaArr === null) return null;
-	const mediaIdURLs = [];
-
-	// arrayからURLを探し出す
-	mediaArr.forEach(media => {
-		const id = media.id_str;
-		// URLを返してもらう即時関数
-		const url = (() => {
-			// 動画以外であればすぐ取得できる
-			if (media.type !== 'video') return media.media_url_https;
-			// 動画の場合は複数URLの中からもっともビットレートの高い物を選ぶ
-			return selectHighestBitrate (media.video_info.variants);
-		})();
-		mediaIdURLs.push({id, url});
-	});
-	return mediaIdURLs;
-};
-
 const fetchFav = (callback) => {
-	const twitter_url = 'https://twitter.com/';
 	const params = {
 		screen_name:	credentials.targetID,
 		count:			credentials.tweets_count,
@@ -302,37 +269,76 @@ const fetchFav = (callback) => {
 	});
 };
 
-const formatTweets = (tweets, callback) => {
-	const tweetsCount = tweets.length - 1;
-	tweets.forEach((tweet) => {
+// もっともビットレートの高い動画を選ぶ
+const selectHighestBitrate = variants => {
+	// 空の物を用意しておく
+	let highest = { bitrate: 0 };
+	variants.forEach (variant => {
+		// mp4じゃなかったら帰る
+		if(variant.content_type !== 'video/mp4') return;
+		// もし今までの物よりビットレートが高ければ、上書きする
+		if ( highest.bitrate < variant.bitrate) {
+			highest = variant;
+		}
+	});
+	return highest.url;
+};
+
+// 渡されたmediaデータの中からURLを取り出す
+const parseMediaIdURLs = mediaArr => {
+	if (mediaArr === null) return null;
+	const mediaIdURLs = [];
+
+	// arrayからURLを探し出す
+	mediaArr.forEach(media => {
+		const id = media.id_str;
+		// URLを返してもらう即時関数
+		const url = (() => {
+			// 動画以外であればすぐ取得できる
+			if (media.type !== 'video') return media.media_url_https;
+			// 動画の場合は複数URLの中からもっともビットレートの高い物を選ぶ
+			return selectHighestBitrate (media.video_info.variants);
+		})();
+		mediaIdURLs.push({id, url});
+	});
+	return mediaIdURLs;
+};
+
+const formatTweets = (tweets_raw, callback) => {
+	const tweetsCount = tweets_raw.length - 1;
+	// 戻り値を格納する配列
+	const tweets_arr = [];
+	const tweets_IDs = [];
+	let count = 0;
+	tweets_raw.forEach((tweet) => {
+		// TODO: IDが取得済みのものだったらreturnする処理
+
 		// console.log(tweet.id_str);
 		// return;
 		// get tweer data
+		const id = tweet.id_str;
 		const user = tweet.user;
 		const tweetScreenName = user.screen_name;
 		const extended_entities = tweet.extended_entities;
 		const mediaInPost = (extended_entities) ? extended_entities.media : null;
-		const mediaIdURLs = parseMediaIdURLs(mediaInPost);
+		// media付きでなければ戻る
+		if (!mediaInPost) return;
+
+		// mediaのURLを取得する
+		const mediaIdURL_arr = parseMediaIdURLs(mediaInPost);
 
 		// tweetのURLを生成
 		const tweet_url = twitter_url + tweetScreenName + '/status/' + tweet.id_str;
 		// slackに投げる文字列の生成
 		const slackMsg = '@' + credentials.targetID + 'でfavした画像だよ。\n' + tweet_url;
 		const slackPayload = generateSlackPayload(slackMsg);
-		if(mediaIdURLs) {
-			fetchSaveImages(mediaIdURLs, tweetScreenName, slackPayload);
-		}
+
+		// 出力データをセット
+		tweets_arr.push({id, tweetScreenName, mediaIdURL_arr, slackPayload});
+		tweets_IDs.push(id);
+		count += 1;
 	});
-	// return new Promise((resolve, reject) => {
-	// 		// エラーが発生してたらメッセージを表示して終了
-	// 		if (error) {
-	// 			reject('twtr fetch error');
-	// 			callback('twtr fetch error', 'twtr fetch error');
-	// 			return;
-	// 		}
-	// 		resolve(tweets);
-	// });
-	console.log('count: %s', tweetsCount + 1);
+	return {count, tweets_IDs, tweets_arr};
 };
 
 const hoge = () => {
@@ -351,5 +357,12 @@ exports.handler = async (event, context, callback) => {
 	// const since_id = await twId.getLastId();
 	const tweets_raw = await fetchFav(callback);
 	const tweets_formatted = await formatTweets(tweets_raw, callback);
-	// console.log(tweets_formatted);
+
+	// DBに取得済みのtweets_idを保存
+	// twId.putTweetsId(tweets_formatted.tweets_IDs);
+	// console.log(tweets_formatted.tweets_arr);
+	tweets_formatted.tweets_arr.forEach(tweet => {
+		fetchSaveImages(tweet);
+	});
+	console.log('count: %s', tweets_formatted.count);
 };
