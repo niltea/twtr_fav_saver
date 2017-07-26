@@ -355,8 +355,12 @@ const formatTweets = (tweets_raw, tweets_saved, callback) => {
 	return {count, tweets_IDs, tweets_arr};
 };
 
-const hoge = () => {
-	if (tweetsCount < 0) {
+exports.handler = async (event, context, callback) => {
+	const tweets_saved = await twId.getTweetsId(callback);
+	const tweets_raw = await fetchFav(callback);
+	const tweets_formatted = await formatTweets(tweets_raw, tweets_saved, callback);
+
+	if (tweets_formatted.count <= 0) {
 		// watchdogのタイミングだったらSlackに投げる
 		if (isEnableWatchdog) {
 			const slackPayload = generateSlackPayload(null, true);
@@ -365,15 +369,6 @@ const hoge = () => {
 		callback(null, 'no new tweet found.');
 		return;
 	}
-};
-
-exports.handler = async (event, context, callback) => {
-	const tweets_saved = await twId.getTweetsId(callback);
-	const tweets_raw = await fetchFav(callback);
-	const tweets_formatted = await formatTweets(tweets_raw, tweets_saved, callback);
-
-	// DBに取得済みのtweets_idを保存
-	twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
 
 	// console.log(tweets_formatted.tweets_arr);
 	tweets_formatted.tweets_arr.forEach(tweet => {
