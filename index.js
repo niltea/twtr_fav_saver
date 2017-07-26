@@ -40,9 +40,6 @@ const credentials = {
 	}
 };
 
-// init twitter
-const twitter_url = 'https://twitter.com/';
-const twitterClient = new twitter(credentials.twtr);
 
 // init aws
 // AWS.Config(credentials.aws);
@@ -282,53 +279,77 @@ const parseMediaIdURLs = mediaArr => {
 	return mediaIdURLs;
 };
 
-const fetchFav = (context, callback) => {
+const fetchFav = (callback) => {
+	const twitter_url = 'https://twitter.com/';
 	const params = {
 		screen_name:	credentials.targetID,
 		count:			credentials.tweets_count,
-		// since_id:		credentials.since_id,
 	};
 	const endpoint = 'favorites/list.json';
-
-	twitterClient.get(endpoint , params, (error, tweets, response) => {
-		// エラーが発生してたらメッセージを表示して終了
-		if (error) {
-			console.error('twtr fetch error');
-			callback('twtr fetch error');
-			return;
-		}
-
-		const l = tweets.length - 1;
-		if (l < 0) {
-			// watchdogのタイミングだったらSlackに投げる
-			if (isEnableWatchdog) {
-				const slackPayload = generateSlackPayload(null, true);
-				postSlack(slackPayload);
+	// init twitter
+	const twitterClient = new twitter(credentials.twtr);
+	// fetch tweets
+	return new Promise((resolve, reject) => {
+		twitterClient.get(endpoint , params, (error, tweets, response) => {
+			// エラーが発生してたらメッセージを表示して終了
+			if (error) {
+				reject('twtr fetch error');
+				callback('twtr fetch error', 'twtr fetch error');
+				return;
 			}
-			callback(null, 'no new tweet found.');
-			return;
-		}
-		tweets.forEach((tweet) => {
-			// get tweer data
-			const user = tweet.user;
-			const tweetScreenName = user.screen_name;
-			const extended_entities = tweet.extended_entities;
-			const mediaInPost = (extended_entities) ? extended_entities.media : null;
-			const mediaIdURLs = parseMediaIdURLs(mediaInPost);
-
-			// tweetのURLを生成
-			const tweet_url = twitter_url + tweetScreenName + '/status/' + tweet.id_str;
-			// slackに投げる文字列の生成
-			const slackMsg = '@' + credentials.targetID + 'でfavした画像だよ。\n' + tweet_url;
-			const slackPayload = generateSlackPayload(slackMsg);
-			if(mediaIdURLs) {
-				fetchSaveImages(mediaIdURLs, tweetScreenName, slackPayload);
-			}
+			resolve(tweets);
 		});
-		console.log('count: %s, first: %s, last: %s', l + 1,  firstID, lastID);
 	});
 };
 
-exports.handler = (event, context, callback) => {
-	fetchFav(context);
+const formatTweets = (tweets, callback) => {
+	const tweetsCount = tweets.length - 1;
+	tweets.forEach((tweet) => {
+		// console.log(tweet.id_str);
+		// return;
+		// get tweer data
+		const user = tweet.user;
+		const tweetScreenName = user.screen_name;
+		const extended_entities = tweet.extended_entities;
+		const mediaInPost = (extended_entities) ? extended_entities.media : null;
+		const mediaIdURLs = parseMediaIdURLs(mediaInPost);
+
+		// tweetのURLを生成
+		const tweet_url = twitter_url + tweetScreenName + '/status/' + tweet.id_str;
+		// slackに投げる文字列の生成
+		const slackMsg = '@' + credentials.targetID + 'でfavした画像だよ。\n' + tweet_url;
+		const slackPayload = generateSlackPayload(slackMsg);
+		if(mediaIdURLs) {
+			fetchSaveImages(mediaIdURLs, tweetScreenName, slackPayload);
+		}
+	});
+	// return new Promise((resolve, reject) => {
+	// 		// エラーが発生してたらメッセージを表示して終了
+	// 		if (error) {
+	// 			reject('twtr fetch error');
+	// 			callback('twtr fetch error', 'twtr fetch error');
+	// 			return;
+	// 		}
+	// 		resolve(tweets);
+	// });
+	console.log('count: %s', tweetsCount + 1);
+};
+
+const hoge = () => {
+	if (tweetsCount < 0) {
+		// watchdogのタイミングだったらSlackに投げる
+		if (isEnableWatchdog) {
+			const slackPayload = generateSlackPayload(null, true);
+			postSlack(slackPayload);
+		}
+		callback(null, 'no new tweet found.');
+		return;
+	}
+};
+
+exports.handler = async (event, context, callback) => {
+	// const since_id = await twId.getLastId();
+	const tweets_raw = await fetchFav(callback);
+	const tweets_formatted = await formatTweets(tweets_raw, callback);
+	// console.log(tweets_formatted);
 };
