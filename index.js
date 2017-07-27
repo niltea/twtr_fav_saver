@@ -238,12 +238,14 @@ const fetchSaveImages = (tweet) => {
 	});
 
 	// パラメータをもとにファイルのFetchと保存
-	requestParam_arr.forEach(async (requestParam) => {
+	requestParam_arr.forEach((requestParam) => {
 		const _slack = (requestParam.postSlack) ? slackPayload : null;
-		saveImage({
-			body:         await fetchImage(requestParam.fetchParam),
-			fileMeta:     requestParam.fileMeta,
-			slackPayload: _slack
+		fetchImage(requestParam.fetchParam).then (body => {
+			saveImage({
+				body:         body,
+				fileMeta:     requestParam.fileMeta,
+				slackPayload: _slack
+			});
 		});
 	});
 };
@@ -342,27 +344,29 @@ const formatTweets = (tweets_raw, tweets_saved, callback) => {
 	return {count, tweets_IDs, tweets_arr};
 };
 
-exports.handler = async (event, context, callback) => {
+exports.handler = (event, context, callback) => {
 	credentials.targetID = event.target_id || 'niltea';
-	const tweets_saved = await twId.getTweetsId(callback);
-	const tweets_raw = await fetchFav(callback);
-	const tweets_formatted = await formatTweets(tweets_raw, tweets_saved, callback);
+	twId.getTweetsId(callback).then((tweets_saved) => {
+		fetchFav(callback).then((tweets_raw) => {
+			const tweets_formatted = formatTweets(tweets_raw, tweets_saved, callback);
 
-	if (tweets_formatted.count <= 0) {
-		// watchdogのタイミングだったらSlackに投げる
-		if (isEnableWatchdog) {
-			const slackPayload = generateSlackPayload(null, true);
-			postSlack(slackPayload);
-		}
-		callback(null, 'no new tweet found.');
-		return;
-	}
-
-	tweets_formatted.tweets_arr.forEach(tweet => {
-		fetchSaveImages(tweet);
+			if (tweets_formatted.count <= 0) {
+				// watchdogのタイミングだったらSlackに投げる
+				if (isEnableWatchdog) {
+					const slackPayload = generateSlackPayload(null, true);
+					postSlack(slackPayload);
+				}
+				callback(null, 'no new tweet found.');
+				return;
+			}
+			tweets_formatted.tweets_arr.forEach(tweet => {
+				fetchSaveImages(tweet);
+			});
+			// DBに取得済みのtweets_idを保存
+			twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
+			callback(null, 'count: %s', tweets_formatted.count);
+		});
 	});
-	// DBに取得済みのtweets_idを保存
-	twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
+	return;
 
-	console.log('count: %s', tweets_formatted.count);
 };
