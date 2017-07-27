@@ -346,27 +346,29 @@ const formatTweets = (tweets_raw, tweets_saved, callback) => {
 
 exports.handler = (event, context, callback) => {
 	credentials.targetID = event.target_id || 'niltea';
-	twId.getTweetsId(callback).then((tweets_saved) => {
-		fetchFav(callback).then((tweets_raw) => {
-			const tweets_formatted = formatTweets(tweets_raw, tweets_saved, callback);
 
-			if (tweets_formatted.count <= 0) {
-				// watchdogのタイミングだったらSlackに投げる
-				if (isEnableWatchdog) {
-					const slackPayload = generateSlackPayload(null, true);
-					postSlack(slackPayload);
-				}
-				callback(null, 'no new tweet found.');
-				return;
+	// tweetと保存済みtweet一覧を取得してくる
+	const promise_tweets  = fetchFav(callback);
+	const promise_savedID = twId.getTweetsId(callback);
+	Promise.all([promise_savedID, promise_tweets]).then((retVal) => {
+		const tweets_saved = retVal[0];
+		const tweets_raw = retVal[1];
+		const tweets_formatted = formatTweets(tweets_raw, tweets_saved, callback);
+		if (tweets_formatted.count <= 0) {
+			// watchdogのタイミングだったらSlackに投げる
+			if (isEnableWatchdog) {
+				const slackPayload = generateSlackPayload(null, true);
+				postSlack(slackPayload);
 			}
-			tweets_formatted.tweets_arr.forEach(tweet => {
-				fetchSaveImages(tweet);
-			});
-			// DBに取得済みのtweets_idを保存
-			twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
-			callback(null, 'count: %s', tweets_formatted.count);
+			callback(null, 'no new tweet found.');
+			return;
+		}
+		tweets_formatted.tweets_arr.forEach(tweet => {
+			fetchSaveImages(tweet);
 		});
+		// DBに取得済みのtweets_idを保存
+		twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
+		callback(null, 'count: %s', tweets_formatted.count);
 	});
 	return;
-
 };
