@@ -86,6 +86,10 @@ const twId = new class {
 				}
 				const item = data.Item;
 				const tweetsList = [];
+				if (item === undefined || item.tweets === undefined) {
+					resolve(tweetsList);
+					return;
+				}
 				item.tweets.L.forEach(item => {
 					tweetsList.push(item.S);
 				})
