@@ -176,17 +176,16 @@ const fetchImage = (fetchParam) => {
 	});
 };
 
-const saveLocal = ({body, fileMeta, slackPayload}) => {
+const saveLocal = ({body, fileMeta, slackPayload}, callback) => {
 	// save local
 	fs.mkdir(fileMeta.imgSavePath, function(err) {
 		if (err && err.code !== 'EEXIST'){
-			console.log('code: %s', err.code);
-			console.log('err: %s', err);
+			callback(`err: ${err}`);
 			return false;
 		}
 		fs.mkdir(fileMeta.dest, function(err) {
 			if (err && err.code !== 'EEXIST'){
-				console.log('err: %s', err);
+				callback(`err: ${err}`);
 				return false;
 			}
 			fs.writeFileSync(fileMeta.dest + fileMeta.fileName, body, 'binary');
@@ -194,7 +193,7 @@ const saveLocal = ({body, fileMeta, slackPayload}) => {
 		});
 	});
 };
-const saveS3 = ({body, fileMeta, slackPayload}) => {
+const saveS3 = ({body, fileMeta, slackPayload}, callback) => {
 	// init S3
 	const s3 = new AWS.S3(credentials.aws);
 
@@ -206,7 +205,7 @@ const saveS3 = ({body, fileMeta, slackPayload}) => {
 			console.log(err);
 			return false;
 		} else {
-			console.log('saved');
+			callback(null, `saved: ${fileMeta.fileName}`);
 			if (slackPayload) postSlack(slackPayload);
 			return true;
 		}
@@ -214,20 +213,20 @@ const saveS3 = ({body, fileMeta, slackPayload}) => {
 };
 
 // 画像の保存を行う
-const saveImage = (fileData) => {
+const saveImage = (fileData, callback) => {
 	if(!fileData.body) {
 		console.log('err: no body');
 		return;
 	}
 	if(is_saveLocal) {
-		saveLocal(fileData);
+		saveLocal(fileData, callback);
 	} else {
-		saveS3(fileData);
+		saveS3(fileData, callback);
 	}
 };
 
 // 画像のフェッチを行い、保存する
-const fetchSaveImages = (tweet) => {
+const fetchSaveImages = (tweet, callback) => {
 	const {mediaIdURL_arr, tweetScreenName, slackPayload} = tweet;
 	const imgSavePath = credentials.imgSavePath;
 	// 渡されたURLをForeachし、Fetchパラメーターを生成する
@@ -249,7 +248,7 @@ const fetchSaveImages = (tweet) => {
 				body:         body,
 				fileMeta:     requestParam.fileMeta,
 				slackPayload: _slack
-			});
+			}, callback);
 		});
 	});
 };
@@ -368,11 +367,11 @@ exports.handler = (event, context, callback) => {
 			return;
 		}
 		tweets_formatted.tweets_arr.forEach(tweet => {
-			fetchSaveImages(tweet);
+			fetchSaveImages(tweet, callback);
 		});
 		// DBに取得済みのtweets_idを保存
 		twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
-		callback(null, 'count: %s', tweets_formatted.count);
+		callback(null, `count: ${tweets_formatted.count}`);
 	});
 	return;
 };

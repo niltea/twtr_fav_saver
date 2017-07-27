@@ -1,8 +1,6 @@
 {
   "dependencies": {
-    "aws-sdk": "^2.88.0",
     "fs": "^0.0.1-security",
-    "querystring": "^0.2.0",
     "request": "^2.81.0",
     "twitter": "^1.7.1"
   },
@@ -10,5 +8,17 @@
   "version": "1.0.0",
   "main": "index.js",
   "author": "niltea <futurabodoni@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "aws-sdk": "^2.91.0",
+    "eslint": "^4.3.0"
+  },
+  "scripts": {
+    "test": "npm -s run-script lint && npm -s run-script unit",
+    "unit": "istanbul `[ $COVERAGE ] && echo 'cover _mocha' || echo 'test mocha'` -- test test/basic",
+    "lint": "eslint ./*.js --fix",
+    "initLambda": "node ./script/initLambda.js",
+    "build": "node ./script/build.js",
+    "publish": "node ./script/publish.js"
+  }
 }
