@@ -12,7 +12,7 @@ const fs = require('fs');
 const date = new Date();
 const hour = date.getHours();
 const min = date.getMinutes();
-const isEnableWatchdog = ((hour === 13 || hour === 1) && (min >= 56 || min <= 3)) ? true : false;
+const isEnableWatchdog = ((hour === 13 || hour === 1) && (0 <= min && min <= 9)) ? true : false;
 
 // get credentials
 const credentials = {
