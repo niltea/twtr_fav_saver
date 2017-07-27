@@ -1,9 +1,9 @@
-"use strict";
+'use strict';
+/*global process:false*/
 const is_saveLocal = false;
 
 // load packages
 const AWS = require('aws-sdk');
-const qs = require('querystring');
 const twitter = require('twitter');
 const request = require('request');
 const fs = require('fs');
@@ -15,27 +15,28 @@ const min = date.getMinutes();
 const isEnableWatchdog = ((hour === 13 || hour === 1) && (0 <= min && min <= 9)) ? true : false;
 
 // get credentials
+const env = process.env;
 const credentials = {
 	tweets_count:				20,
 	targetID:					null,
 	imgSavePath:				'images/',
-	bucket:						process.env.aws_s3_saveBucket,
+	bucket:						env.aws_s3_saveBucket,
 	twtr: {
-		consumer_key:			process.env.twtr_consumer_key,
-		consumer_secret:		process.env.twtr_consumer_secret,
-		access_token_key:		process.env.twtr_access_token_key,
-		access_token_secret:	process.env.twtr_access_token_secret
+		consumer_key:			env.twtr_consumer_key,
+		consumer_secret:		env.twtr_consumer_secret,
+		access_token_key:		env.twtr_access_token_key,
+		access_token_secret:	env.twtr_access_token_secret
 	},
 	slack: {
-		url:					process.env.slack_webhook_URL,
-		icon_url:				process.env.slack_icon_url,
-		username:				process.env.slack_username,
-		channel:				process.env.slack_channel,
+		url:					env.slack_webhook_URL,
+		icon_url:				env.slack_icon_url,
+		username:				env.slack_username,
+		channel:				env.slack_channel,
 	},
 	aws: {
-		accessKeyId:			process.env.aws_accessKeyId,
-		secretAccessKey:		process.env.aws_secretAccessKey,
-		region:					process.env.aws_region
+		accessKeyId:			env.aws_accessKeyId,
+		secretAccessKey:		env.aws_secretAccessKey,
+		region:					env.aws_region
 	}
 };
 
@@ -53,21 +54,20 @@ const twId = new class {
 		const idArr_formatted = [];
 		idArr.forEach (id => {
 			idArr_formatted.push ({ S: id });
-		})
+		});
 		return idArr_formatted;
 	}
 	putTweetsId (idArr, callback) {
 		const _dbParam = {
 			TableName: this.TableName,
 			Item: {
-				target_id:  {"S": credentials.targetID},
-				tweets: {"L": this.formatID(idArr)}
+				target_id:  {'S': credentials.targetID},
+				tweets: {'L': this.formatID(idArr)}
 			}
 		};
-		this.dynamodb.putItem(_dbParam, function(err, data) {
+		this.dynamodb.putItem(_dbParam, function(err) {
 			if (err) {
-				console.log(err, err.stack);
-				callback(err)
+				callback(err, err.stack);
 			}
 		});
 	}
@@ -76,7 +76,7 @@ const twId = new class {
 			const _dbParam = {
 				TableName: this.TableName,
 				Key: {
-					target_id: {"S": credentials.targetID}
+					target_id: {'S': credentials.targetID}
 				}
 			};
 			this.dynamodb.getItem(_dbParam, function(err, data) {
@@ -92,19 +92,18 @@ const twId = new class {
 				}
 				item.tweets.L.forEach(item => {
 					tweetsList.push(item.S);
-				})
+				});
 				resolve(tweetsList);
 			});
 		});
 	}
 };
 
-const postSlack = (slackPayload) => {
-	const headers = { 'Content-Type':'application/json' };
+const postSlack = (slackPayload, callback) => {
 	const options = { json: slackPayload };
-	request.post(credentials.slack.url, options, (error, response, body) => {
+	request.post(credentials.slack.url, options, (error, response) => {
 		if (response.body !== 'ok') {
-			console.log(error);
+			callback(error);
 		}
 	});
 };
@@ -189,7 +188,7 @@ const saveLocal = ({body, fileMeta, slackPayload}, callback) => {
 				return false;
 			}
 			fs.writeFileSync(fileMeta.dest + fileMeta.fileName, body, 'binary');
-			if (slackPayload) postSlack(slackPayload);
+			if (slackPayload) postSlack(slackPayload, callback);
 		});
 	});
 };
@@ -199,10 +198,9 @@ const saveS3 = ({body, fileMeta, slackPayload}, callback) => {
 
 	const s3Prop = fileMeta.objectProp;
 	s3Prop.Body = body;
-	s3.putObject(s3Prop, function(err, result) {
+	s3.putObject(s3Prop, function(err) {
 		if (err) {
-			console.log('========== err:S3 ==========');
-			console.log(err);
+			callback(err);
 			return false;
 		} else {
 			callback(null, `saved: ${fileMeta.fileName}`);
@@ -215,7 +213,7 @@ const saveS3 = ({body, fileMeta, slackPayload}, callback) => {
 // 画像の保存を行う
 const saveImage = (fileData, callback) => {
 	if(!fileData.body) {
-		console.log('err: no body');
+		callback('err: no body');
 		return;
 	}
 	if(is_saveLocal) {
@@ -263,7 +261,7 @@ const fetchFav = (callback) => {
 	const twitterClient = new twitter(credentials.twtr);
 	// fetch tweets
 	return new Promise((resolve, reject) => {
-		twitterClient.get(endpoint , params, (error, tweets, response) => {
+		twitterClient.get(endpoint , params, (error, tweets) => {
 			// エラーが発生してたらメッセージを表示して終了
 			if (error) {
 				reject('twtr fetch error');
@@ -310,12 +308,11 @@ const parseMediaIdURLs = mediaArr => {
 	return mediaIdURLs;
 };
 
-const formatTweets = (tweets_raw, tweets_saved, callback) => {
-	const tweetsCount = tweets_raw.length - 1;
+const formatTweets = (tweets_raw, tweets_saved) => {
 	// 戻り値を格納する配列
 	const tweets_arr = [];
 	const tweets_IDs = [];
-	let count = 0;
+	let tweetsCount = 0;
 	tweets_raw.forEach((tweet) => {
 		// get tweet data
 		const id = tweet.id_str;
@@ -328,7 +325,6 @@ const formatTweets = (tweets_raw, tweets_saved, callback) => {
 		tweets_IDs.push(id);
 		// media付きでなければ戻る
 		if (!mediaInPost) return;
-		// TODO: IDが取得済みのものだったらreturnする処理
 		if (tweets_saved.indexOf(id) >= 0) return;
 
 		// mediaのURLを取得する
@@ -342,9 +338,9 @@ const formatTweets = (tweets_raw, tweets_saved, callback) => {
 
 		// 出力データをセット
 		tweets_arr.push({id, tweetScreenName, mediaIdURL_arr, slackPayload});
-		count += 1;
+		tweetsCount += 1;
 	});
-	return {count, tweets_IDs, tweets_arr};
+	return {tweetsCount, tweets_IDs, tweets_arr};
 };
 
 exports.handler = (event, context, callback) => {
@@ -356,12 +352,12 @@ exports.handler = (event, context, callback) => {
 	Promise.all([promise_savedID, promise_tweets]).then((retVal) => {
 		const tweets_saved = retVal[0];
 		const tweets_raw = retVal[1];
-		const tweets_formatted = formatTweets(tweets_raw, tweets_saved, callback);
-		if (tweets_formatted.count <= 0) {
+		const tweets_formatted = formatTweets(tweets_raw, tweets_saved);
+		if (tweets_formatted.tweetsCount <= 0) {
 			// watchdogのタイミングだったらSlackに投げる
 			if (isEnableWatchdog) {
 				const slackPayload = generateSlackPayload(null, true);
-				postSlack(slackPayload);
+				postSlack(slackPayload, callback);
 			}
 			callback(null, 'no new tweet found.');
 			return;
@@ -371,7 +367,7 @@ exports.handler = (event, context, callback) => {
 		});
 		// DBに取得済みのtweets_idを保存
 		twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
-		callback(null, `count: ${tweets_formatted.count}`);
+		callback(null, `count: ${tweets_formatted.tweetsCount}`);
 	});
 	return;
 };
