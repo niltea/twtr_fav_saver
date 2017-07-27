@@ -1,7 +1,5 @@
 {
   "dependencies": {
-    "fs": "^0.0.1-security",
-    "request": "^2.81.0",
     "twitter": "^1.7.1"
   },
   "name": "twtr_fav_to_slack",
@@ -11,7 +9,9 @@
   "license": "MIT",
   "devDependencies": {
     "aws-sdk": "^2.91.0",
-    "eslint": "^4.3.0"
+    "eslint": "^4.3.0",
+    "fs": "^0.0.1-security",
+    "https": "^1.0.0"
   },
   "scripts": {
     "test": "npm -s run-script lint && npm -s run-script unit",

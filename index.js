@@ -1,11 +1,12 @@
 'use strict';
-/*global process:false*/
+/*global process:false Buffer:false*/
 const is_saveLocal = false;
 
 // load packages
 const AWS = require('aws-sdk');
 const twitter = require('twitter');
-const request = require('request');
+const https = require('https');
+const url = require('url');
 const fs = require('fs');
 
 // get time
@@ -100,12 +101,24 @@ const twId = new class {
 };
 
 const postSlack = (slackPayload, callback) => {
-	const options = { json: slackPayload };
-	request.post(credentials.slack.url, options, (error, response) => {
-		if (response.body !== 'ok') {
-			callback(error);
+	const _url = url.parse(credentials.slack.url);
+	const postParam = {
+		method:   'POST',
+		hostname: _url.hostname,
+		path: _url.path
+	};
+	const req = https.request(postParam, res => {
+		if (res.statusCode !== 200) {
+			callback('err - postSlack: ' + res.statusCode);
 		}
 	});
+	req.on('error', (err) => {
+		callback('err - postSlack');
+	});
+
+	req.write(JSON.stringify(slackPayload));
+	req.end();
+	return;
 };
 
 // Slackに投げるObjectの生成
@@ -135,15 +148,12 @@ const setRequestParam = (mediaIdURL, imgSavePath, tweetScreenName) => {
 		if (ext === '.mp4') return 'image/mp4';
 		return null;
 	})();
-
+	const _url = url.parse(mediaIdURL.url);
 	// クエリパラメーター生成
 	const fetchParam = {
 		method:   'GET',
-		url:      mediaIdURL.url,
-		encoding: null,
-		headers:  {
-			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 Safari/537.36'
-		}
+		hostname: _url.hostname,
+		path: _url.path,
 	};
 
 	// 保存ファイルのメタデーター作成
@@ -165,12 +175,16 @@ const setRequestParam = (mediaIdURL, imgSavePath, tweetScreenName) => {
 // 画像のフェッチを行う
 const fetchImage = (fetchParam) => {
 	return new Promise((resolve, reject) => {
-		request(fetchParam, (err, res, body) => {
-			if(!err && res.statusCode === 200){
-				resolve(body);
-			} else {
-				reject(err);
-			}
+		const req = https.request(fetchParam, (res) => {
+			let data = [];
+			res.on('data', (chunk) => { data.push(chunk); });
+			res.on('end', () => {
+				resolve(Buffer.concat( data ));
+			});
+		});
+		req.end();
+		req.on('error', (err) => {
+			reject(err);
 		});
 	});
 };
@@ -188,6 +202,7 @@ const saveLocal = ({body, fileMeta, slackPayload}, callback) => {
 				return false;
 			}
 			fs.writeFileSync(fileMeta.dest + fileMeta.fileName, body, 'binary');
+			callback(null, `Saved to Local: ${fileMeta.dest + fileMeta.fileName}`);
 			if (slackPayload) postSlack(slackPayload, callback);
 		});
 	});
@@ -203,7 +218,7 @@ const saveS3 = ({body, fileMeta, slackPayload}, callback) => {
 			callback(err);
 			return false;
 		} else {
-			callback(null, `saved: ${fileMeta.fileName}`);
+			callback(null, `Saved to S3: ${s3Prop.Key}`);
 			if (slackPayload) postSlack(slackPayload);
 			return true;
 		}
