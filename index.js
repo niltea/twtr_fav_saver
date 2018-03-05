@@ -1,10 +1,11 @@
 'use strict';
+/* eslint-disable no-console */
 /*global process:false Buffer:false*/
 const is_saveLocal = false;
 
 // load packages
 const AWS = require('aws-sdk');
-const twitter = require('twitter');
+const Twitter = require('twitter');
 const https = require('https');
 const url = require('url');
 const fs = require('fs');
@@ -13,7 +14,7 @@ const fs = require('fs');
 const date = new Date();
 const hour = date.getHours();
 const min = date.getMinutes();
-const isEnableWatchdog = ((hour === 13 || hour === 1) && (0 <= min && min <= 9)) ? true : false;
+const isEnableWatchdog = ((hour === 13 || hour === 1) && (0 <= min && min <= 9));
 
 // get credentials
 const env = process.env;
@@ -113,12 +114,12 @@ const postSlack = (slackPayload, callback) => {
 		}
 	});
 	req.on('error', (err) => {
+		console.log(err);
 		callback('err - postSlack');
 	});
 
 	req.write(JSON.stringify(slackPayload));
 	req.end();
-	return;
 };
 
 // Slackに投げるObjectの生成
@@ -246,7 +247,7 @@ const fetchSaveImages = (tweet, callback) => {
 	let requestParam_arr = [];
 	mediaIdURL_arr.forEach((mediaIdURL, mediaCount) => {
 		const requestParam = setRequestParam(mediaIdURL, imgSavePath, tweetScreenName);
-		requestParam.postSlack = (mediaCount === 0) ? true : false;
+		requestParam.postSlack = (mediaCount === 0);
 
 		// ないとは思うけど空だったら何もせずにreturn
 		if(!requestParam) return;
@@ -273,7 +274,7 @@ const fetchFav = (callback) => {
 	};
 	const endpoint = 'favorites/list.json';
 	// init twitter
-	const twitterClient = new twitter(credentials.twtr);
+	const twitterClient = new Twitter(credentials.twtr);
 	// fetch tweets
 	return new Promise((resolve, reject) => {
 		twitterClient.get(endpoint , params, (error, tweets) => {
@@ -384,5 +385,4 @@ exports.handler = (event, context, callback) => {
 		twId.putTweetsId(tweets_formatted.tweets_IDs, callback);
 		callback(null, `count: ${tweets_formatted.tweetsCount}`);
 	});
-	return;
 };
