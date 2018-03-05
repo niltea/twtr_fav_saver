@@ -1,12 +1,11 @@
 'use strict';// test script
 /* eslint-disable no-console */
-var event = {'target_id': 'niltea'};
+const event = { 'target_id': 'niltea_vt', 'imgSavePath': 'images_vt/' };
 
-var context = {};
-var callback = function(err, data) {
-	if (err) console.log(err);
-	if (data) console.log(data);
-	return;
+const context = {};
+const callback = function (err, data) {
+  if (err) console.log(err);
+  if (data) console.log(data);
 };
 
 const index = require('./index.js');
