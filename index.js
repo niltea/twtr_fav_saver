@@ -42,8 +42,6 @@ const credentials = {
   }
 };
 
-const twitter_url = 'https://twitter.com/';
-
 // dynamoDB
 const twId = new class {
   constructor() {
@@ -246,8 +244,10 @@ const saveImage = (fileData, callback) => {
 
 // 画像のフェッチを行い、保存する
 const fetchSaveImages = (tweet, callback) => {
-  const { mediaIdURL_arr, tweetScreenName, slackPayload } = tweet;
+  const { mediaIdURL_arr, tweetScreenName } = tweet;
   const imgSavePath = credentials.imgSavePath;
+
+  let slackMsg = '@' + credentials.targetID + 'でfavした画像だよ。';
   // 渡されたURLをForeachし、Fetchパラメーターを生成する
   let requestParam_arr = [];
   mediaIdURL_arr.forEach((mediaIdURL, mediaCount) => {
@@ -259,9 +259,13 @@ const fetchSaveImages = (tweet, callback) => {
     requestParam_arr.push(requestParam);
   });
 
+  // 保存先URL
+  const baseURI = `http://${credentials.bucket}.s3-website-${credentials.aws.region}.amazonaws.com/`;
   // パラメータをもとにファイルのFetchと保存
   requestParam_arr.forEach((requestParam) => {
-    const _slack = (requestParam.postSlack) ? slackPayload : null;
+    // S3ファイルURIを積む
+    slackMsg += `\n${baseURI}${requestParam.fileMeta.objectProp.Key}`;
+    const _slack = (requestParam.postSlack) ? generateSlackPayload(slackMsg) : null;
     fetchImage(requestParam.fetchParam).then(body => {
       saveImage({
         body        : body,
@@ -351,14 +355,8 @@ const formatTweets = (tweets_raw, tweets_saved) => {
     // mediaのURLを取得する
     const mediaIdURL_arr = parseMediaIdURLs(mediaInPost);
 
-    // tweetのURLを生成
-    const tweet_url = twitter_url + tweetScreenName + '/status/' + tweet.id_str;
-    // slackに投げる文字列の生成
-    const slackMsg = '@' + credentials.targetID + 'でfavした画像だよ。\n' + tweet_url;
-    const slackPayload = generateSlackPayload(slackMsg);
-
     // 出力データをセット
-    tweets_arr.push({ id, tweetScreenName, mediaIdURL_arr, slackPayload });
+    tweets_arr.push({ id, tweetScreenName, mediaIdURL_arr });
     tweetsCount += 1;
   });
   return { tweetsCount, tweets_IDs, tweets_arr };
