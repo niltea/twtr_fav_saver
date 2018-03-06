@@ -247,7 +247,7 @@ const fetchSaveImages = (tweet, callback) => {
   const { mediaIdURL_arr, tweetScreenName } = tweet;
   const imgSavePath = credentials.imgSavePath;
 
-  let slackMsg = '@' + credentials.targetID + 'でfavした画像だよ。';
+  let slackMsg = `@${credentials.targetID}でfavした画像だよ。\nscreen name: ${tweetScreenName}`;
   // 渡されたURLをForeachし、Fetchパラメーターを生成する
   let requestParam_arr = [];
   mediaIdURL_arr.forEach((mediaIdURL, mediaCount) => {
@@ -365,6 +365,7 @@ const formatTweets = (tweets_raw, tweets_saved) => {
 exports.handler = (event, context, callback) => {
   credentials.targetID = event.target_id || 'niltea';
   credentials.imgSavePath = event.imgSavePath || 'images/';
+  credentials.slack.channel = event.slackChannel || env.slack_channel;
 
   // tweetと保存済みtweet一覧を取得してくる
   const promise_tweets = fetchFav(callback);
