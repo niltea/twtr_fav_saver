@@ -343,7 +343,7 @@ const formatTweets = (tweets_raw, tweets_saved) => {
     // get tweet data
     const id = tweet.id_str;
     const user = tweet.user;
-    const tweetUserName = tweet.name;
+    const tweetUserName = user.name;
     const tweetScreenName = user.screen_name;
     const extended_entities = tweet.extended_entities;
     const mediaInPost = (extended_entities) ? extended_entities.media : null;
@@ -378,7 +378,6 @@ exports.handler = (event, context, callback) => {
     const tweets_saved = retVal[0];
     const tweets_raw = retVal[1];
     const tweets_formatted = formatTweets(tweets_raw, tweets_saved);
-
     if (tweets_formatted.tweetsCount <= 0) {
       // watchdogのタイミングだったらSlackに投げる
       if (isEnableWatchdog) {

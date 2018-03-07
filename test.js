@@ -5,7 +5,7 @@ const event = {
   imgSavePath : 'images_vt/',
   slackChannel: '_shizurin',
   slackName   : '静凛',
-  slackIcon   : 'http://twitter-images.nilgiri-tea.net/asset/icon_shizurin.jpg',
+  slackIcon   : 'http://twitter-images.nilgiri-tea.net/assets/icon_shizurin.jpg',
 };
 const context = {};
 const callback = function (err, data) {
