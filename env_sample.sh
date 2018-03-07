@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 export twtr_targetID=niltea
 export twtr_consumer_key=hogehoge
 export twtr_consumer_secret=hogehoge
@@ -13,3 +14,4 @@ export aws_accessKeyId=hogehoge
 export aws_secretAccessKey=hogehoge
 export aws_region=ap-northeast-1
 export aws_s3_saveBucket=hogehoge
+export aws_s3_domain=s3bucket.example.com

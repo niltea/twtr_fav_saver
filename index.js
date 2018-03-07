@@ -23,6 +23,7 @@ const credentials = {
   targetID    : null,
   imgSavePath : 'images/',
   bucket      : env.aws_s3_saveBucket,
+  domain      : env.aws_s3_domain,
   twtr        : {
     consumer_key       : env.twtr_consumer_key,
     consumer_secret    : env.twtr_consumer_secret,
@@ -244,10 +245,10 @@ const saveImage = (fileData, callback) => {
 
 // 画像のフェッチを行い、保存する
 const fetchSaveImages = (tweet, callback) => {
-  const { mediaIdURL_arr, tweetScreenName } = tweet;
+  const { mediaIdURL_arr, tweetScreenName, tweetUserName } = tweet;
   const imgSavePath = credentials.imgSavePath;
 
-  let slackMsg = `@${credentials.targetID}でfavした画像だよ。\nscreen name: ${tweetScreenName}`;
+  let slackMsg = `@${credentials.targetID}でfavした画像だよ。\nTweet by: ${tweetUserName}`;
   // 渡されたURLをForeachし、Fetchパラメーターを生成する
   let requestParam_arr = [];
   mediaIdURL_arr.forEach((mediaIdURL, mediaCount) => {
@@ -260,7 +261,7 @@ const fetchSaveImages = (tweet, callback) => {
   });
 
   // 保存先URL
-  const baseURI = `http://${credentials.bucket}.s3-website-${credentials.aws.region}.amazonaws.com/`;
+  const baseURI = `http://${credentials.domain}/`;
   // パラメータをもとにファイルのFetchと保存
   requestParam_arr.forEach((requestParam) => {
     // S3ファイルURIを積む
@@ -342,6 +343,7 @@ const formatTweets = (tweets_raw, tweets_saved) => {
     // get tweet data
     const id = tweet.id_str;
     const user = tweet.user;
+    const tweetUserName = tweet.name;
     const tweetScreenName = user.screen_name;
     const extended_entities = tweet.extended_entities;
     const mediaInPost = (extended_entities) ? extended_entities.media : null;
@@ -356,7 +358,7 @@ const formatTweets = (tweets_raw, tweets_saved) => {
     const mediaIdURL_arr = parseMediaIdURLs(mediaInPost);
 
     // 出力データをセット
-    tweets_arr.push({ id, tweetScreenName, mediaIdURL_arr });
+    tweets_arr.push({ id, tweetUserName, tweetScreenName, mediaIdURL_arr });
     tweetsCount += 1;
   });
   return { tweetsCount, tweets_IDs, tweets_arr };
