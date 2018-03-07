@@ -132,7 +132,7 @@ const generateSlackPayload = (text, isWatchdog) => {
   if (isWatchdog) {
     text = 'いきてるよー。';
   }
-  return { icon_url, username, channel, text };
+  return { icon_url, username, channel, text, as_user: true };
 };
 
 const setRequestParam = (mediaIdURL, imgSavePath, tweetScreenName) => {
