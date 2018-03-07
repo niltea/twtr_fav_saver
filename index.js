@@ -33,8 +33,8 @@ const credentials = {
   slack       : {
     url     : env.slack_webhook_URL,
     icon_url: env.slack_icon_url,
-    username: env.slack_username,
-    channel : env.slack_channel,
+    username: null,
+    channel : null,
   },
   aws         : {
     accessKeyId    : env.aws_accessKeyId,
@@ -248,7 +248,7 @@ const fetchSaveImages = (tweet, callback) => {
   const { mediaIdURL_arr, tweetScreenName, tweetUserName } = tweet;
   const imgSavePath = credentials.imgSavePath;
 
-  let slackMsg = `@${credentials.targetID}でfavした画像だよ。\nTweet by: ${tweetUserName}`;
+  let slackMsg = `@${credentials.targetID} の新着favを見つけました！\nTweet by: ${tweetUserName}`;
   // 渡されたURLをForeachし、Fetchパラメーターを生成する
   let requestParam_arr = [];
   mediaIdURL_arr.forEach((mediaIdURL, mediaCount) => {
@@ -368,6 +368,8 @@ exports.handler = (event, context, callback) => {
   credentials.targetID = event.target_id || 'niltea';
   credentials.imgSavePath = event.imgSavePath || 'images/';
   credentials.slack.channel = event.slackChannel || env.slack_channel;
+  credentials.slack.username = event.slackName || env.slack_username;
+  credentials.slack.icon_url = event.slackIcon || env.slack_icon_url;
 
   // tweetと保存済みtweet一覧を取得してくる
   const promise_tweets = fetchFav(callback);
