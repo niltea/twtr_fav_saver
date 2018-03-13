@@ -1,7 +1,7 @@
 'use strict';// test script
 /* eslint-disable no-console */
 const event = {
-  target_id   : 'niltea_vt',
+  target_id   : 'niltea',
   imgSavePath : 'images_vt/',
   slackChannel: '_shizurin',
   slackName   : '静凛',

@@ -251,10 +251,10 @@ const fetchSaveImages = (tweet, callback) => {
   let slackMsg = `@${credentials.targetID} の新着favを見つけました！\nTweet by: ${tweetUserName}`;
   // 渡されたURLをForeachし、Fetchパラメーターを生成する
   let requestParam_arr = [];
+  const lastIndex = mediaIdURL_arr.length - 1;
   mediaIdURL_arr.forEach((mediaIdURL, mediaCount) => {
     const requestParam = setRequestParam(mediaIdURL, imgSavePath, tweetScreenName);
-    requestParam.postSlack = (mediaCount === 0);
-
+    requestParam.postSlack = (mediaCount === lastIndex);
     // ないとは思うけど空だったら何もせずにreturn
     if (!requestParam) return;
     requestParam_arr.push(requestParam);
