@@ -48,7 +48,9 @@ const twId = new class {
   constructor() {
     this.TableName = 'twtr_fav';
     this.dynamodb = new AWS.DynamoDB({
-      region: credentials.aws.region
+      region: credentials.aws.region,
+      accessKeyId: credentials.aws.accessKeyId,
+      secretAccessKey: credentials.aws.secretAccessKey,
     });
   }
 
