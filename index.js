@@ -1,4 +1,3 @@
-'use strict';
 /* eslint-disable no-console */
 /*global process:false Buffer:false*/
 const is_saveLocal = false;
@@ -279,7 +278,7 @@ const fetchSaveImages = (tweet, callback) => {
   });
 };
 
-const fetchFav = (callback) => {
+const fetchFav = async (callback) => {
   const params = {
     screen_name: credentials.targetID,
     count      : credentials.tweets_count,
@@ -292,8 +291,8 @@ const fetchFav = (callback) => {
     twitterClient.get(endpoint, params, (error, tweets) => {
       // エラーが発生してたらメッセージを表示して終了
       if (error) {
-        reject('twtr fetch error');
-        callback('twtr fetch error', 'twtr fetch error');
+        reject();
+        callback('twitterClient', 'twtr fetch error');
         return;
       }
       resolve(tweets);
@@ -347,14 +346,23 @@ const formatTweets = (tweets_raw, tweets_saved) => {
     const user = tweet.user;
     const tweetUserName = user.name;
     const tweetScreenName = user.screen_name;
+    // 投稿内のmediaを取り出す
     const extended_entities = tweet.extended_entities;
     const mediaInPost = (extended_entities) ? extended_entities.media : null;
 
     // 処理したIDを突っ込んでおく
     tweets_IDs.push(id);
     // media付きでなければ戻る
-    if (!mediaInPost) return;
-    if (tweets_saved.indexOf(id) >= 0) return;
+    if (!mediaInPost) {
+      console.log(`No media found, skipping: ${id}`);
+      return;
+    }
+    const isSavedBefore = (tweets_saved.indexOf(id) >= 0);
+    if (isSavedBefore) {
+      console.log(`Saved before, skipping: ${id}`);
+      return;
+    }
+    console.log(`Not saved before, add tweet: ${id}`);
 
     // mediaのURLを取得する
     const mediaIdURL_arr = parseMediaIdURLs(mediaInPost);
@@ -366,7 +374,7 @@ const formatTweets = (tweets_raw, tweets_saved) => {
   return { tweetsCount, tweets_IDs, tweets_arr };
 };
 
-exports.handler = (event, context, callback) => {
+exports.handler = async (event, context, callback) => {
   credentials.targetID = event.target_id || 'niltea';
   credentials.imgSavePath = event.imgSavePath || 'images/';
   credentials.slack.channel = event.slackChannel || env.slack_channel;
@@ -374,17 +382,21 @@ exports.handler = (event, context, callback) => {
   credentials.slack.icon_url = event.slackIcon || env.slack_icon_url;
 
   // tweetと保存済みtweet一覧を取得してくる
-  const promise_tweets = fetchFav(callback);
   const promise_savedID = twId.getTweetsId(callback);
+  const promise_tweets = fetchFav(callback);
   Promise.all([promise_savedID, promise_tweets]).then((retVal) => {
+    // tweets / 保存済IDを取得出来たら処理開始する
     const tweets_saved = retVal[0];
     const tweets_raw = retVal[1];
     const tweets_formatted = formatTweets(tweets_raw, tweets_saved);
     if (tweets_formatted.tweetsCount <= 0) {
-      // watchdogのタイミングだったらSlackに投げる
+      // tweetsが0なら基本何もしない
+      // ただし、watchdogのタイミングならSlackに投げる
       if (isEnableWatchdog) {
         const slackPayload = generateSlackPayload(null, true);
         postSlack(slackPayload, callback);
+        callback(null, 'no new tweet found, called watchDog.');
+        return;
       }
       callback(null, 'no new tweet found.');
       return;
