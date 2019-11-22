@@ -1,16 +1,15 @@
 'use strict';// test script
 /* eslint-disable no-console */
 const event = {
-  target_id   : 'niltea',
+  target_id   : 'niltea_vt',
   imgSavePath : 'images_vt/',
-  slackChannel: '_shizurin',
-  slackName   : '静凛',
-  slackIcon   : 'http://twitter-images.nilgiri-tea.net/assets/icon_shizurin.jpg',
+  slackChannel: '_twitter_fav',
+  slackName   : 'twitter fav test',
+  slackIcon   : 'http://twitter-images.nilgiri-tea.net/assets/ishida.jpg',
 };
 const context = {};
-const callback = function (err, data) {
-  if (err) console.log(err);
-  if (data) console.log(data);
+const callback = function (msg) {
+  if (msg) console.log(msg);
 };
 
 const index = require('./index.js');
