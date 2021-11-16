@@ -8,7 +8,7 @@
   "author": "niltea <futurabodoni@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "aws-sdk": "^2.91.0",
+    "aws-sdk": "^2.814.0",
     "eslint": "^4.3.0",
     "fs": "^0.0.1-security",
     "https": "^1.0.0"
